@@ -21,18 +21,22 @@ import static com.hmdp.utils.RedisConstants.LOCK_SHOP_KEY;
 @Component
 public class CacheClient {
 
+    // 操作 Redis 的模板，专门处理字符串相关的数据结构
     private final StringRedisTemplate stringRedisTemplate;
 
+    // 用于缓存重建的线程池，避免在业务线程中执行耗时操作
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     public CacheClient(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
+    // 普通写缓存：直接将对象序列化为 JSON 写入 Redis，并设置 TTL
     public void set(String key, Object value, Long time, TimeUnit unit) {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
     }
 
+    // 写入逻辑过期的缓存：不依赖 Redis TTL，而是在 value 中额外存一份过期时间
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
         // 设置逻辑过期
         RedisData redisData = new RedisData();
@@ -42,6 +46,7 @@ public class CacheClient {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
     }
 
+    // 缓存穿透解决方案：查询空数据时写入短期的空值到缓存，拦截后续同样的请求
     public <R,ID> R queryWithPassThrough(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit){
         String key = keyPrefix + id;
@@ -72,6 +77,7 @@ public class CacheClient {
         return r;
     }
 
+    // 逻辑过期 + 异步重建：用于解决热点 key 的缓存击穿问题
     public <R, ID> R queryWithLogicalExpire(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
@@ -117,6 +123,7 @@ public class CacheClient {
         return r;
     }
 
+    // 互斥锁方案：通过加锁保证同一时间只有一个线程重建缓存，其他线程等待或重试
     public <R, ID> R queryWithMutex(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
@@ -166,11 +173,13 @@ public class CacheClient {
         return r;
     }
 
+    // 尝试获取分布式锁：使用 setIfAbsent 实现，附带过期时间防止死锁
     private boolean tryLock(String key) {
         Boolean flag = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
         return BooleanUtil.isTrue(flag);
     }
 
+    // 释放分布式锁：直接删除对应的锁 key
     private void unlock(String key) {
         stringRedisTemplate.delete(key);
     }
