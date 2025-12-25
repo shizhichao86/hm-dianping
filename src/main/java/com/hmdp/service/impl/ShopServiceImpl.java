@@ -37,7 +37,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 1.从redis查询商铺缓存
         String shopJson = stringRedisTemplate.opsForValue().get(key);
         // 2.判断是否存在
-        if (StrUtil.isNotBlank(shopJson)) {
+        if (StrUtil.isNotBlank(shopJson)) {  //表示字符串非空且不全是空白即缓存命中
             // 3.存在，直接返回
             Shop shop = JSONUtil.toBean(shopJson, Shop.class);
             return Result.ok(shop);
@@ -52,7 +52,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         Shop shop = getById(id);
         // 5.不存在，返回错误
         if (shop == null) {
-            // 将空值写入redis
+            // 将空值写入redis； 缓存空值防止穿透
             stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             // 返回错误信息
             return Result.fail("店铺不存在！");
@@ -70,6 +70,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (id == null) {
             return Result.fail("店铺id不能为空");
         }
+        // 更新逻辑：先更新 DB 再删缓存  带事务
         // 1.更新数据库
         updateById(shop);
         // 2.删除缓存
