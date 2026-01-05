@@ -14,14 +14,31 @@ import java.util.concurrent.TimeUnit;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 
+/**
+ * 刷新token拦截器
+ * 用于处理用户认证信息的刷新和维护，从Redis中获取用户信息并保存到ThreadLocal中
+ */
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 构造函数
+     * @param stringRedisTemplate Redis字符串模板，用于操作Redis
+     */
     public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
+    /**
+     * 预处理方法，在请求处理之前执行
+     * 主要功能：从请求头获取token，从Redis中获取用户信息，刷新token有效期，并将用户信息保存到ThreadLocal
+     * @param request HTTP请求对象
+     * @param response HTTP响应对象
+     * @param handler 处理器对象
+     * @return 始终返回true，表示放行请求
+     * @throws Exception 异常
+     */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         // 1.获取请求头中的token
@@ -46,6 +63,15 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    /**
+     * 请求完成后执行的方法
+     * 主要功能：清理ThreadLocal中的用户信息，防止内存泄漏
+     * @param request HTTP请求对象
+     * @param response HTTP响应对象
+     * @param handler 处理器对象
+     * @param ex 异常对象
+     * @throws Exception 异常
+     */
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         // 移除用户

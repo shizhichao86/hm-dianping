@@ -28,7 +28,7 @@ import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
- *  服务实现类
+ * 店铺服务实现类
  * </p>
  *
  */
@@ -42,10 +42,17 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private CacheClient cacheClient;
 
+    /**
+     * 根据店铺ID查询店铺信息
+     * 使用缓存穿透解决方案：先查Redis，未命中再查数据库，最后写回缓存并设置TTL
+     *
+     * @param id 店铺ID
+     * @return 查询结果，包含店铺信息或错误信息
+     */
     @Override
     public Result queryById(Long id) {
         // 使用自定义的CacheClient封装缓存逻辑：
-        // 当前启用的是“缓存穿透”方案：先查Redis，未命中再查数据库，最后写回缓存并设置TTL
+        // 当前启用的是"缓存穿透"方案：先查Redis，未命中再查数据库，最后写回缓存并设置TTL
         // 解决缓存穿透
         Shop shop = cacheClient
                 .queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
@@ -65,6 +72,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok(shop);
     }
 
+    /**
+     * 更新店铺信息
+     * 先更新数据库，然后删除对应的缓存，保证下次查询时能获取最新数据
+     *
+     * @param shop 包含更新信息的店铺对象
+     * @return 更新结果
+     */
     @Override
     @Transactional
     public Result update(Shop shop) {
@@ -79,6 +93,16 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         return Result.ok();
     }
 
+    /**
+     * 根据店铺类型查询店铺列表，支持按坐标查询附近店铺
+     * 根据是否传入经纬度决定查询方式：未传经纬度直接按类型走数据库分页；传入经纬度基于Redis GEO查询附近商铺
+     *
+     * @param typeId 店铺类型ID
+     * @param current 当前页码
+     * @param x 经度坐标（可选）
+     * @param y 纬度坐标（可选）
+     * @return 查询结果，包含店铺列表
+     */
     @Override
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
         // 根据是否传入经纬度决定查询方式：

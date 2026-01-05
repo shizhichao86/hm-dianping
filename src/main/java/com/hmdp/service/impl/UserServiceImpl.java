@@ -32,7 +32,7 @@ import static com.hmdp.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 
 /**
  * <p>
- * 服务实现类
+ * 用户服务实现类
  * </p>
  *
  */
@@ -43,9 +43,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 发送短信验证码
+     * @param phone 手机号
+     * @param session HTTP会话
+     * @return Result 包含操作结果的响应对象
+     */
     @Override
     public Result sendCode(String phone, HttpSession session) {
-        // 1.校验手机号
+        // 1.校验手机号（格式不合法直接返回）
         if (RegexUtils.isPhoneInvalid(phone)) {
             // 2.如果不符合，返回错误信息
             return Result.fail("手机号格式错误！");
@@ -53,7 +59,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 3.符合，生成验证码
         String code = RandomUtil.randomNumbers(6);
 
-        // 4.保存验证码到 redis
+        // 4.保存验证码到 redis，设置有效期（防止验证码长期占用）
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
 
         // 5.发送验证码
@@ -62,6 +68,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok();
     }
 
+    /**
+     * 用户登录
+     * @param loginForm 登录表单数据
+     * @param session HTTP会话
+     * @return Result 包含登录令牌的响应对象
+     */
     @Override
     public Result login(LoginFormDTO loginForm, HttpSession session) {
         // 1.校验手机号
@@ -87,11 +99,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             user = createUserWithPhone(phone);
         }
 
-        // 7.保存用户信息到 redis中
+        // 7.保存用户信息到 redis中，基于token实现无状态登录
         // 7.1.随机生成token，作为登录令牌
         String token = UUID.randomUUID().toString(true);
         // 7.2.将User对象转为HashMap存储
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        // 使用 BeanUtil + CopyOptions 将实体转为 Map<String, Object>，忽略null并统一转为字符串，便于Redis Hash存储
         Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),
                 CopyOptions.create()
                         .setIgnoreNullValue(true)
@@ -106,34 +119,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return Result.ok(token);
     }
 
+    /**
+     * 用户签到
+     * @return Result 包含操作结果的响应对象
+     */
     @Override
     public Result sign() {
         // 1.获取当前登录用户
         Long userId = UserHolder.getUser().getId();
         // 2.获取日期
         LocalDateTime now = LocalDateTime.now();
-        // 3.拼接key
+        // 3.拼接key：使用 userId + 年月 作为区分，一个用户一个月对应一个Bitmap
         String keySuffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
         String key = USER_SIGN_KEY + userId + keySuffix;
         // 4.获取今天是本月的第几天
         int dayOfMonth = now.getDayOfMonth();
-        // 5.写入Redis SETBIT key offset 1
+        // 5.写入Redis SETBIT key offset 1，offset从0开始，代表本月第dayOfMonth天已签到
         stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
         return Result.ok();
     }
 
+    /**
+     * 获取连续签到天数
+     * @return Result 包含连续签到天数的响应对象
+     */
     @Override
     public Result signCount() {
         // 1.获取当前登录用户
         Long userId = UserHolder.getUser().getId();
         // 2.获取日期
         LocalDateTime now = LocalDateTime.now();
-        // 3.拼接key
+        // 3.拼接key：与sign保持一致，确保统计的是当前用户本月的签到Bitmap
         String keySuffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
         String key = USER_SIGN_KEY + userId + keySuffix;
         // 4.获取今天是本月的第几天
         int dayOfMonth = now.getDayOfMonth();
-        // 5.获取本月截止今天为止的所有的签到记录，返回的是一个十进制的数字 BITFIELD sign:5:202203 GET u14 0
+        // 5.获取本月截止今天为止的所有签到记录，返回的是一个十进制数字：
+        //    使用 BITFIELD key GET uN 0，一次性取出从1号到今天的N个bit
         List<Long> result = stringRedisTemplate.opsForValue().bitField(
                 key,
                 BitFieldSubCommands.create()
@@ -147,10 +169,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (num == null || num == 0) {
             return Result.ok(0);
         }
-        // 6.循环遍历
+        // 6.循环遍历低位bit，统计从今天开始连续签到的天数
         int count = 0;
         while (true) {
-            // 6.1.让这个数字与1做与运算，得到数字的最后一个bit位  // 判断这个bit位是否为0
+            // 6.1.让这个数字与1做与运算，只保留最后一个bit位，用于判断今天/某天是否签到
             if ((num & 1) == 0) {
                 // 如果为0，说明未签到，结束
                 break;
@@ -158,12 +180,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
                 // 如果不为0，说明已签到，计数器+1
                 count++;
             }
-            // 把数字右移一位，抛弃最后一个bit位，继续下一个bit位
+            // 右移一位，抛弃刚检查过的bit，继续判断前一天
             num >>>= 1;
         }
         return Result.ok(count);
     }
 
+    /**
+     * 根据手机号创建新用户
+     * @param phone 手机号
+     * @return User 创建的用户对象
+     */
     private User createUserWithPhone(String phone) {
         // 1.创建用户
         User user = new User();
@@ -174,3 +201,4 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         return user;
     }
 }
+

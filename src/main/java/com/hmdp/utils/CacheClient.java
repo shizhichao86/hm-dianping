@@ -17,6 +17,9 @@ import java.util.function.Function;
 import static com.hmdp.utils.RedisConstants.CACHE_NULL_TTL;
 import static com.hmdp.utils.RedisConstants.LOCK_SHOP_KEY;
 
+/**
+ * 缓存客户端工具类，提供多种缓存策略来解决缓存穿透、缓存击穿等问题
+ */
 @Slf4j
 @Component
 public class CacheClient {
@@ -31,12 +34,26 @@ public class CacheClient {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
-    // 普通写缓存：直接将对象序列化为 JSON 写入 Redis，并设置 TTL
+    /**
+     * 普通写缓存：直接将对象序列化为 JSON 写入 Redis，并设置 TTL
+     *
+     * @param key   缓存键
+     * @param value 缓存值
+     * @param time  过期时间
+     * @param unit  时间单位
+     */
     public void set(String key, Object value, Long time, TimeUnit unit) {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
     }
 
-    // 写入逻辑过期的缓存：不依赖 Redis TTL，而是在 value 中额外存一份过期时间
+    /**
+     * 写入逻辑过期的缓存：不依赖 Redis TTL，而是在 value 中额外存一份过期时间
+     *
+     * @param key   缓存键
+     * @param value 缓存值
+     * @param time  过期时间
+     * @param unit  时间单位
+     */
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
         // 设置逻辑过期
         RedisData redisData = new RedisData();
@@ -46,7 +63,19 @@ public class CacheClient {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
     }
 
-    // 缓存穿透解决方案：查询空数据时写入短期的空值到缓存，拦截后续同样的请求
+    /**
+     * 缓存穿透解决方案：查询空数据时写入短期的空值到缓存，拦截后续同样的请求
+     *
+     * @param keyPrefix   缓存键前缀
+     * @param id          数据库ID
+     * @param type        返回值类型
+     * @param dbFallback  数据库查询回调函数
+     * @param time        缓存过期时间
+     * @param unit        时间单位
+     * @param <R>         返回值泛型
+     * @param <ID>        ID泛型
+     * @return            查询结果
+     */
     public <R,ID> R queryWithPassThrough(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit){
         String key = keyPrefix + id;
@@ -77,7 +106,19 @@ public class CacheClient {
         return r;
     }
 
-    // 逻辑过期 + 异步重建：用于解决热点 key 的缓存击穿问题
+    /**
+     * 逻辑过期 + 异步重建：用于解决热点 key 的缓存击穿问题
+     *
+     * @param keyPrefix   缓存键前缀
+     * @param id          数据库ID
+     * @param type        返回值类型
+     * @param dbFallback  数据库查询回调函数
+     * @param time        缓存过期时间
+     * @param unit        时间单位
+     * @param <R>         返回值泛型
+     * @param <ID>        ID泛型
+     * @return            查询结果
+     */
     public <R, ID> R queryWithLogicalExpire(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
@@ -123,7 +164,19 @@ public class CacheClient {
         return r;
     }
 
-    // 互斥锁方案：通过加锁保证同一时间只有一个线程重建缓存，其他线程等待或重试
+    /**
+     * 互斥锁方案：通过加锁保证同一时间只有一个线程重建缓存，其他线程等待或重试
+     *
+     * @param keyPrefix   缓存键前缀
+     * @param id          数据库ID
+     * @param type        返回值类型
+     * @param dbFallback  数据库查询回调函数
+     * @param time        缓存过期时间
+     * @param unit        时间单位
+     * @param <R>         返回值泛型
+     * @param <ID>        ID泛型
+     * @return            查询结果
+     */
     public <R, ID> R queryWithMutex(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
@@ -173,13 +226,22 @@ public class CacheClient {
         return r;
     }
 
-    // 尝试获取分布式锁：使用 setIfAbsent 实现，附带过期时间防止死锁
+    /**
+     * 尝试获取分布式锁：使用 setIfAbsent 实现，附带过期时间防止死锁
+     *
+     * @param key 锁的键
+     * @return    是否获取锁成功
+     */
     private boolean tryLock(String key) {
         Boolean flag = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
         return BooleanUtil.isTrue(flag);
     }
 
-    // 释放分布式锁：直接删除对应的锁 key
+    /**
+     * 释放分布式锁：直接删除对应的锁 key
+     *
+     * @param key 锁的键
+     */
     private void unlock(String key) {
         stringRedisTemplate.delete(key);
     }

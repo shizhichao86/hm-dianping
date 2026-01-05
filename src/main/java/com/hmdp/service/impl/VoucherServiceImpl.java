@@ -18,7 +18,7 @@ import static com.hmdp.utils.RedisConstants.SECKILL_STOCK_KEY;
 
 /**
  * <p>
- *  服务实现类
+ * 优惠券服务实现类
  * </p>
  *
  */
@@ -30,6 +30,12 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 根据店铺ID查询优惠券信息
+     *
+     * @param shopId 店铺ID
+     * @return 包含优惠券列表的结果对象
+     */
     @Override
     public Result queryVoucherOfShop(Long shopId) {
         // 查询优惠券信息
@@ -38,6 +44,11 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         return Result.ok(vouchers);
     }
 
+    /**
+     * 添加秒杀优惠券
+     *
+     * @param voucher 优惠券对象，包含秒杀相关信息
+     */
     @Override
     @Transactional
     public void addSeckillVoucher(Voucher voucher) {

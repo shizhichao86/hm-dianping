@@ -7,6 +7,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * Redis分布式ID生成器
+ * 基于时间戳+序列号的组合方式生成全局唯一ID
+ */
 @Component
 public class RedisIdWorker {
     /**
@@ -20,10 +24,19 @@ public class RedisIdWorker {
 
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 构造函数
+     * @param stringRedisTemplate Redis字符串模板
+     */
     public RedisIdWorker(StringRedisTemplate stringRedisTemplate) {
         this.stringRedisTemplate = stringRedisTemplate;
     }
 
+    /**
+     * 生成下一个唯一ID
+     * @param keyPrefix ID前缀，用于区分不同业务类型的ID
+     * @return 生成的唯一ID
+     */
     public long nextId(String keyPrefix) {
         // 1.生成时间戳
         LocalDateTime now = LocalDateTime.now();

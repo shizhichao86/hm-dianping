@@ -16,6 +16,10 @@ import java.util.stream.Collectors;
 
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TYPE_KEY;
 
+/**
+ * 店铺类型服务实现类
+ * 继承ServiceImpl提供基础的CRUD操作，并实现IShopTypeService接口
+ */
 @Service
 public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> implements IShopTypeService {
 
@@ -23,6 +27,12 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 查询店铺类型列表
+     * 优先从Redis缓存中获取数据，如果缓存未命中则从数据库查询并更新缓存
+     *
+     * @return Result 包含店铺类型列表的响应结果
+     */
     @Override
     public Result queryTypeList() {
         // 构造缓存使用的 key（店铺类型列表是一个固定 key）

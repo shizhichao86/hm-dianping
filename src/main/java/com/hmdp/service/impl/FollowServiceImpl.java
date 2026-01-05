@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 /**
  * <p>
- * 服务实现类
+ * 关注服务实现类
  * </p>
  *
  */
@@ -33,6 +33,12 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     @Resource
     private IUserService userService;
 
+    /**
+     * 关注或取关用户
+     * @param followUserId 被关注用户的ID
+     * @param isFollow 是否关注，true为关注，false为取关
+     * @return Result 操作结果
+     */
     @Override
     public Result follow(Long followUserId, Boolean isFollow) {
         // 1.获取登录用户
@@ -61,6 +67,11 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         return Result.ok();
     }
 
+    /**
+     * 判断当前用户是否关注了指定用户
+     * @param followUserId 被关注用户的ID
+     * @return Result 包含是否关注的布尔值
+     */
     @Override
     public Result isFollow(Long followUserId) {
         // 1.获取登录用户
@@ -71,6 +82,11 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         return Result.ok(count > 0);
     }
 
+    /**
+     * 查询共同关注的用户列表
+     * @param id 目标用户的ID
+     * @return Result 包含共同关注用户列表
+     */
     @Override
     public Result followCommons(Long id) {
         // 1.获取当前用户

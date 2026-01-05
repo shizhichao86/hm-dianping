@@ -98,11 +98,13 @@ public class UserController {
 
     @PostMapping("/sign")
     public Result sign(){
+        // 调用用户服务完成今日签到（基于Bitmap记录）
         return userService.sign();
     }
 
     @GetMapping("/sign/count")
     public Result signCount(){
+        // 查询当前用户本月连续签到天数
         return userService.signCount();
     }
 }

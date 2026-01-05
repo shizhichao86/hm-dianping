@@ -32,7 +32,7 @@ import static com.hmdp.utils.RedisConstants.FEED_KEY;
 
 /**
  * <p>
- * 服务实现类
+ * 博客服务实现类
  * </p>
  *
  */
@@ -50,6 +50,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     @Resource
     private IFollowService followService;
 
+    /**
+     * 查询热门博客
+     * @param current 当前页码
+     * @return Result 包含热门博客列表的响应结果
+     */
     @Override
     public Result queryHotBlog(Integer current) {
         // 分页按点赞数倒序查询热门博文列表
@@ -66,6 +71,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(records);
     }
 
+    /**
+     * 根据ID查询博客详情
+     * @param id 博客ID
+     * @return Result 包含博客详情的响应结果
+     */
     @Override
     public Result queryBlogById(Long id) {
         // 1.根据id查询博文
@@ -80,6 +90,10 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(blog);
     }
 
+    /**
+     * 判断博客是否被当前用户点赞
+     * @param blog 博客对象
+     */
     private void isBlogLiked(Blog blog) {
         // 1.获取登录用户
         UserDTO user = UserHolder.getUser();
@@ -95,6 +109,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         blog.setIsLike(score != null);
     }
 
+    /**
+     * 点赞或取消点赞博客
+     * @param id 博客ID
+     * @return Result 操作结果
+     */
     @Override
     public Result likeBlog(Long id) {
         // 1.获取登录用户
@@ -122,6 +141,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok();
     }
 
+    /**
+     * 查询博客的点赞用户列表
+     * @param id 博客ID
+     * @return Result 包含前5个点赞用户的响应结果
+     */
     @Override
     public Result queryBlogLikes(Long id) {
         String key = BLOG_LIKED_KEY + id;
@@ -145,6 +169,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(userDTOS);
     }
 
+    /**
+     * 保存博客
+     * @param blog 博客对象
+     * @return Result 包含博客ID的响应结果
+     */
     @Override
     public Result saveBlog(Blog blog) {
         // 1.获取登录用户
@@ -169,6 +198,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(blog.getId());
     }
 
+    /**
+     * 查询关注用户的博客列表（滚动分页）
+     * @param max 最大时间戳
+     * @param offset 偏移量
+     * @return Result 包含滚动分页结果的响应
+     */
     @Override
     public Result queryBlogOfFollow(Long max, Integer offset) {
         // 1.获取当前用户
@@ -223,6 +258,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
         return Result.ok(r);
     }
+
+    /**
+     * 查询博客的用户信息
+     * @param blog 博客对象
+     */
     private void queryBlogUser(Blog blog) {
         Long userId = blog.getUserId();
         User user = userService.getById(userId);

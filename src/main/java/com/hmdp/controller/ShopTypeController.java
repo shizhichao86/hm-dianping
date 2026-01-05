@@ -21,6 +21,11 @@ public class ShopTypeController {
     @Resource
     private IShopTypeService typeService;
 
+    /**
+     * 查询所有商铺类型
+     *
+     * @return 商铺类型列表
+     */
     @GetMapping("list")
     public Result queryTypeList() {
         return typeService.queryTypeList();

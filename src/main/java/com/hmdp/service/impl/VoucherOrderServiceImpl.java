@@ -60,11 +60,17 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
 
+    /**
+     * 初始化方法，启动订单处理线程
+     */
     @PostConstruct
     private void init() {
         SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
     }
 
+    /**
+     * 订单处理线程类，用于处理Redis Stream中的订单消息
+     */
     private class VoucherOrderHandler implements Runnable {
         String queueName = "stream.orders";
         @Override
@@ -97,6 +103,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             }
         }
 
+        /**
+         * 处理待处理列表中的订单
+         */
         private void handlePendingList() {
             while (true) {
                 try {
@@ -144,6 +153,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
     }*/
 
+    /**
+     * 创建订单的核心逻辑
+     * @param voucherOrder 订单对象
+     */
     private void createVoucherOrder(VoucherOrder voucherOrder) {
         Long userId = voucherOrder.getUserId();
         Long voucherId = voucherOrder.getVoucherId();
@@ -187,6 +200,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
     }
 
+    /**
+     * 执行秒杀优惠券操作
+     * @param voucherId 优惠券ID
+     * @return Result 包含订单ID或错误信息的结果对象
+     */
     @Override
     public Result seckillVoucher(Long voucherId) {
         Long userId = UserHolder.getUser().getId();
