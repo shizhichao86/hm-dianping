@@ -44,6 +44,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Override
     public Result queryById(Long id) {
+        // 使用自定义的CacheClient封装缓存逻辑：
+        // 当前启用的是“缓存穿透”方案：先查Redis，未命中再查数据库，最后写回缓存并设置TTL
         // 解决缓存穿透
         Shop shop = cacheClient
                 .queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
@@ -70,9 +72,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (id == null) {
             return Result.fail("店铺id不能为空");
         }
-        // 1.更新数据库
+        // 1.先更新数据库中的店铺信息
         updateById(shop);
-        // 2.删除缓存
+        // 2.再删除对应缓存，保证下次查询时能从数据库读取最新数据并重新写入缓存
         stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
         return Result.ok();
     }
